@@ -1,0 +1,132 @@
+/**
+ * Ejemplo cxColas - 1
+ *
+ */
+
+#include <driver/gpio.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
+#include <esp_system.h>
+
+
+#define BUTTON_GPIO 27
+#define LED_GPIO 26
+
+int last_button_state = 1;
+QueueHandle_t buffer;//Objeto de la cola
+
+void tarea1(void*arg)
+{
+    uint32_t snd = 0;
+
+    gpio_set_direction(BUTTON_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(BUTTON_GPIO, GPIO_PULLUP_ONLY);
+
+    int last_button_state = gpio_get_level(BUTTON_GPIO);
+    int button_state;
+
+    while(1)
+    {
+        gpio_set_level(LED_GPIO, 1);
+        vTaskDelay(pdMS_TO_TICKS(500)); // Enciende el LED durante 500 ms
+        gpio_set_level(LED_GPIO, 0);
+        vTaskDelay(pdMS_TO_TICKS(500)); // Apaga el LED durante 500 ms
+
+        
+        /**if (snd < 15)//si es menor que 15
+        {
+            xQueueSend(buffer, &snd, pdMS_TO_TICKS(0));//Envia la variable a la cola
+            snd++;//incrementa la variabl
+            
+
+        }
+        else//si no, espera 5seg para probar el timout de la otra tarea.
+        {
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            snd = 0;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(500));**/
+    }
+}
+
+void button_task(void *pvParameter)
+{
+    gpio_set_direction(BUTTON_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(BUTTON_GPIO, GPIO_PULLUP_ONLY);
+
+    int led_state = 0;
+
+    while (1)
+    {
+        int button_state = gpio_get_level(BUTTON_GPIO);
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        if (button_state == 0)
+        {
+            // Botón presionado, realizar un cambio binario en el LED
+            led_state = !led_state;
+            gpio_set_level(LED_GPIO, led_state);
+
+            // Imprimir el cambio en pantalla
+            printf("Cambio en el estado del LED: %d\n", led_state);
+        }
+
+        vTaskDelay(10 / portTICK_PERIOD_MS); // Pequeña pausa para evitar rebotes del botón
+    }
+}
+
+
+
+
+void tarea2(void*z)
+{
+    gpio_set_direction(BUTTON_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(BUTTON_GPIO, GPIO_PULLUP_ONLY);
+
+    int led_state = 0;
+
+    while (1)
+    {
+        int button_state = gpio_get_level(BUTTON_GPIO);
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Pequeña pausa para evitar rebotes del botón
+        
+        // Botón presionado, realizar un cambio binario en el LED
+        led_state = !led_state;
+        gpio_set_level(LED_GPIO, led_state);
+
+        // Imprimir el cambio en pantalla
+         printf("Cambio en el estado del LED: %d\n", led_state);
+            printf("Cambio en el estado del boton: %d\n", button_state);
+
+        vTaskDelay(10 / portTICK_PERIOD_MS); // Pequeña pausa para evitar rebotes del botón
+    }
+}
+
+
+/**
+    uint32_t rcv = 0;
+    while(1)
+    {
+        if (xQueueReceive(buffer, &rcv, pdMS_TO_TICKS(1000)) == true)//Si recibe el valor dentro de 1 segundo, muestra en pantalla
+        {
+           printf("Item recibido: %lu\n", rcv); // Muestra el valor en pantalla
+        }
+        else
+        {
+            printf("Item no recibido, timeout expiro!");//Si el timeout expira, muestra error.
+        }
+    }
+    **/
+
+
+void app_main()
+{
+    buffer = xQueueCreate(10, sizeof(uint32_t));//crea la cola *buffer* con 10 slots de 4 Bytes
+    gpio_set_direction(LED_GPIO, GPIO_MODE_OUTPUT); // Configurar el LED como salida
+    gpio_set_direction(BUTTON_GPIO, GPIO_MODE_INPUT);
+     // Crear una tarea para detectar el botón
+    xTaskCreate(button_task, "button_task", 4096, NULL, 2, NULL);
+    xTaskCreatePinnedToCore(tarea1, "tarea1", 4096, NULL, 1, NULL, 0);//Crea tarea que escribe valores en la cola
+    xTaskCreatePinnedToCore(tarea2, "tarea2", 4096, NULL, 1, NULL, 0);//Crea tarea que lee valores de la cola.
+}
